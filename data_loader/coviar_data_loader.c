@@ -186,7 +186,9 @@ int decode_video(
     int representation,
     int accumulate) {
 
-    AVCodec *pCodec;
+    AVCodec *pCodec_MPEG4;
+    AVCodec *pCodec_H264;
+    AVCodec *pCodec_HEVC;
     AVCodecContext *pCodecCtx= NULL;  
     AVCodecParserContext *pCodecParserCtx=NULL;  
 
@@ -206,17 +208,21 @@ int decode_video(
       
     avcodec_register_all();  
   
-    pCodec = avcodec_find_decoder(AV_CODEC_ID_MPEG4);  
+    pCodec_MPEG4 = avcodec_find_decoder(AV_CODEC_ID_MPEG4);  
+    pCodec_H264 = avcodec_find_decoder(AV_CODEC_ID_H264);
+    pCodec_HEVC = avcodec_find_decoder(AV_CODEC_ID_HEVC);
     // pCodec = avcodec_find_decoder(AV_CODEC_ID_H264);  
-    if (!pCodec) {  
+    if (!pCodec_MPEG4 || !pCodec_H264 || !pCodec_HEVC) {  
         printf("Codec not found\n");  
         return -1;  
     }  
-    pCodecCtx = avcodec_alloc_context3(pCodec);  
+    pCodecCtx = avcodec_alloc_context3(pCodec_MPEG4);//decodec file format
+    //avcodec_free_context()
     if (!pCodecCtx){  
         printf("Could not allocate video codec context\n");  
         return -1;  
-    }  
+    }
+    exit()
 
     pCodecParserCtx=av_parser_init(AV_CODEC_ID_MPEG4);  
     // pCodecParserCtx=av_parser_init(AV_CODEC_ID_H264);  
