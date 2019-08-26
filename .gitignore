@@ -1,0 +1,4 @@
+data/hmdb51/
+data/ucf101/
+*.mp4
+*.avi
