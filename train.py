@@ -133,7 +133,7 @@ def train(train_loader, model, criterion, optimizer, epoch, cur_lr):
 
         data_time.update(time.time() - end)
 
-        target = target.cuda(async=True)
+        target = target.cuda(non_blocking=True)
         input_var = torch.autograd.Variable(input)
         target_var = torch.autograd.Variable(target)
 
@@ -144,9 +144,9 @@ def train(train_loader, model, criterion, optimizer, epoch, cur_lr):
         loss = criterion(output, target_var)
 
         prec1, prec5 = accuracy(output.data, target, topk=(1, 5))
-        losses.update(loss.data[0], input.size(0))
-        top1.update(prec1[0], input.size(0))
-        top5.update(prec5[0], input.size(0))
+        losses.update(loss.item(), input.size(0))
+        top1.update(prec1.item(), input.size(0))
+        top5.update(prec5.item(), input.size(0))
 
         optimizer.zero_grad()
 
@@ -181,7 +181,7 @@ def validate(val_loader, model, criterion):
 
     end = time.time()
     for i, (input, target) in enumerate(val_loader):
-        target = target.cuda(async=True)
+        target = target.cuda(non_blocking=True)
         input_var = torch.autograd.Variable(input, volatile=True)
         target_var = torch.autograd.Variable(target, volatile=True)
 
@@ -192,9 +192,9 @@ def validate(val_loader, model, criterion):
 
         prec1, prec5 = accuracy(output.data, target, topk=(1, 5))
 
-        losses.update(loss.data[0], input.size(0))
-        top1.update(prec1[0], input.size(0))
-        top5.update(prec5[0], input.size(0))
+        losses.update(loss.item(), input.size(0))
+        top1.update(prec1.item(), input.size(0))
+        top5.update(prec5.item(), input.size(0))
 
         batch_time.update(time.time() - end)
         end = time.time()

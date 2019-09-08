@@ -32,9 +32,10 @@ static const char *src_filename = NULL;
 static int video_stream_idx = -1;
 static AVFrame *frame = NULL;
 static int video_frame_count = 0;
-
+static int whole_flag = 0;
 static int decode_packet(const AVPacket *pkt)
 {
+    int flag = 0;
     int ret = avcodec_send_packet(video_dec_ctx, pkt);
     if (ret < 0) {
         fprintf(stderr, "Error while sending a packet to the decoder: %s\n", av_err2str(ret));
@@ -57,7 +58,7 @@ static int decode_packet(const AVPacket *pkt)
             video_frame_count++;
 
             //printf("%d", video_frame_count);
-            if(video_frame_count < 19){
+            //if(video_frame_count < 19){
             if (frame->pict_type == AV_PICTURE_TYPE_I ) printf("\nI");
            if (frame->pict_type == AV_PICTURE_TYPE_B ) printf("B"); 
             if (frame->pict_type == AV_PICTURE_TYPE_P ) printf("P");
@@ -72,11 +73,17 @@ static int decode_packet(const AVPacket *pkt)
                         video_frame_count, mv->source,
                         mv->w, mv->h, mv->src_x, mv->src_y,
                         mv->dst_x, mv->dst_y, mv->flags);
+                        flag = 1;
                         break;
                     }
                 }
             }
-            av_frame_unref(frame);}
+            
+            if (flag == 0) 
+               if (frame->pict_type != AV_PICTURE_TYPE_I )
+                whole_flag ++;
+            
+            av_frame_unref(frame);
         }
     }
 
@@ -182,7 +189,7 @@ int main(int argc, char **argv)
     /* flush cached frames */
     printf("---------------------\n");
     decode_packet(NULL);
-    printf("\ntotal frames: %d\n", video_frame_count);
+    printf("\ntotal frames: %d, no motiov vector: %d, persentage: %lf\n", video_frame_count, whole_flag, 1.0*whole_flag/video_frame_count);
 
 end:
     avcodec_free_context(&video_dec_ctx);
