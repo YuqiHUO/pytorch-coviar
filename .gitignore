@@ -1,4 +1,6 @@
 data/hmdb51/
 data/ucf101/
+data/charades/
+data_loader/
 *.mp4
 *.avi
