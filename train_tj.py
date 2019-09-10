@@ -9,8 +9,8 @@ import torch.backends.cudnn as cudnn
 import torch.nn.parallel
 import torchvision
 
-from dataset_tj import CoviarDataSet
-from model_tj import Model
+from dataset_tj_finetune import CoviarDataSet
+from model_tj_finetune import Model
 from train_options import parser
 from transforms import GroupCenterCrop
 from transforms import GroupScale
@@ -32,48 +32,39 @@ def main():
     if args.data_name == 'ucf101':
         num_class = 101
     elif args.data_name == 'hmdb51':
-        num_class = 51
+        num_class = 157
+    elif args.data_name == 'charades':
+        num_class = 157
     else:
         raise ValueError('Unknown dataset '+ args.data_name)
 
-    model = Model(num_class)
+    model = Model(num_class, args.representation,
+                  base_model=args.arch)
     print(model)
 
-    transform_i, transform_m, transform_r=model.get_augmentation()
     train_loader = torch.utils.data.DataLoader(
         CoviarDataSet(
             args.data_root,
-            args.data_name, 
-            transform_i, 
-            transform_m, 
-            transform_r,
-            video_list=args.train_list, 
+            args.data_name,
+            video_list=args.train_list,
+            representation=args.representation,
+            transform=model.get_augmentation(),
             is_train=True,
             accumulate=(not args.no_accumulation),
             ),
         batch_size=args.batch_size, shuffle=True,
         num_workers=args.workers, pin_memory=True)
 
-    transform_i=torchvision.transforms.Compose([
-                GroupScale(int(model.scale_size)),
-                GroupCenterCrop(model.crop_size),
-                ]),
-    transform_m=torchvision.transforms.Compose([
-                GroupScale(int(model.scale_size)),
-                GroupCenterCrop(model.crop_size),
-                ]),
-    transform_r=torchvision.transforms.Compose([
-                GroupScale(int(model.scale_size)),
-                GroupCenterCrop(model.crop_size),
-                ])
     val_loader = torch.utils.data.DataLoader(
         CoviarDataSet(
             args.data_root,
             args.data_name,
-            transform_i, 
-            transform_m, 
-            transform_r,
             video_list=args.test_list,
+            representation=args.representation,
+            transform=torchvision.transforms.Compose([
+                GroupScale(int(model.scale_size)),
+                GroupCenterCrop(model.crop_size),
+                ]),
             is_train=False,
             accumulate=(not args.no_accumulation),
             ),
@@ -143,7 +134,7 @@ def train(train_loader, model, criterion, optimizer, epoch, cur_lr):
     end = time.time()
 
     for i, (input, target) in enumerate(train_loader):
-        # print(input.shape)
+        #print(input.shape,target)
         data_time.update(time.time() - end)
 
         target = target.cuda()
@@ -153,7 +144,7 @@ def train(train_loader, model, criterion, optimizer, epoch, cur_lr):
         output = model(input_var)
         # print(input_var.shape)
         # print(output.shape)
-        output = output.view((1,-1) + output.size()[1:])
+        output = output.view((args.batch_size,-1) + output.size()[1:])
         output = torch.mean(output, dim=1)
         # print(output.shape)
 
@@ -202,13 +193,14 @@ def validate(val_loader, model, criterion):
         target_var = torch.autograd.Variable(target, volatile=True)
 
         output = model(input_var)
-        output = output.view((-1, args.num_segments) + output.size()[1:])
+        output = output.view((args.batch_size,-1) + output.size()[1:])
         output = torch.mean(output, dim=1)
         loss = criterion(output, target_var)
 
         prec1, prec5 = accuracy(output.data, target, topk=(1, 5))
 
         losses.update(loss.item(), input.size(0))
+        
         top1.update(prec1.item(), input.size(0))
         top5.update(prec5.item(), input.size(0))
 
