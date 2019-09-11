@@ -96,26 +96,54 @@ class CoviarDataSet(data.Dataset):
             vpath = os.path.join(self._data_root, vid + '.mp4')
             num_frames = get_num_frames(vpath)
             num_gop = num_frames // GOP_SIZE
-            if self._is_train :
-                for x in label:
-                    for gop in range(num_gop):
-                        if (x['start'] < gop*0.4) and ((gop+1)*0.4 < x['end']):
-                            video_path.append(vpath)
-                            gop_index.append(gop)
-                            targets.append(cls2int(x['class']))
-                            ids.append(vid)
-            else:
+
+            for gop in range(num_gop//5):
                 target = torch.IntTensor(157).zero_()
+                c = 0
                 for x in label:
-                    target[cls2int(x['class'])] = 1
-                
-                for gop in range(num_gop):
+                    if (x['start'] < gop*5*0.4) and ((gop*5+1)*0.4 < x['end']):
+                        target[cls2int(x['class'])] = 1
+                        c = c+1
+                # print(target, c)
+                print(c)
+                if c != 0 :
+                    gop_index.append(gop*5)
                     video_path.append(vpath)
-                    gop_index.append(gop)
                     targets.append(target)
                     ids.append(vid)
+
+
+
+            # for x in label:
+            #     for gop in range(num_gop):
+            #         if (x['start'] < gop*5*0.4) and ((gop*5+1)*0.4 < x['end']):
+            #             video_path.append(vpath)
+            #             gop_index.append(gop)
+            #             targets.append(cls2int(x['class']))
+            #             ids.append(vid)
+
+
+            # if self._is_train :
+            #     for x in label:
+            #         for gop in range(num_gop):
+            #             if (x['start'] < gop*0.4) and ((gop+1)*0.4 < x['end']):
+            #                 video_path.append(vpath)
+            #                 gop_index.append(gop)
+            #                 targets.append(cls2int(x['class']))
+            #                 ids.append(vid)
+            # else:
+            #     target = torch.IntTensor(157).zero_()
+            #     for x in label:
+            #         target[cls2int(x['class'])] = 1
                 
-        print(video_path, gop_index, targets, ids)
+            #     for gop in range(num_gop):
+            #         video_path.append(vpath)
+            #         gop_index.append(gop)
+            #         targets.append(target)
+            #         ids.append(vid)
+                
+        # print(video_path, gop_index, targets, ids)
+        print(gop_index)
         return {'video_path': video_path, 'gop_index': gop_index, 'targets': targets, 'ids': ids}
 
 
@@ -171,7 +199,7 @@ class CoviarDataSet(data.Dataset):
 
         # print(input.shape)
         # target = target.long()
-        # print(target)
+        # print(target.shape)
         return input, target
 
 

@@ -14,6 +14,7 @@ from model_tj_finetune import Model
 from train_options import parser
 from transforms import GroupCenterCrop
 from transforms import GroupScale
+from utils import map
 
 SAVE_FREQ = 40
 PRINT_FREQ = 20
@@ -123,106 +124,198 @@ def main():
 
 
 def train(train_loader, model, criterion, optimizer, epoch, cur_lr):
+
     batch_time = AverageMeter()
-    data_time = AverageMeter()
-    losses = AverageMeter()
-    top1 = AverageMeter()
-    top5 = AverageMeter()
+    outputs = []
+    gts = []
+    ids = []
+
 
     model.train()
 
     end = time.time()
-
     for i, (input, target) in enumerate(train_loader):
-        #print(input.shape,target)
-        data_time.update(time.time() - end)
 
-        target = target.cuda()
-        input_var = torch.autograd.Variable(input)
-        target_var = torch.autograd.Variable(target)
-
+        target = target.long()#.cuda(async=True)
+        # assert target[0,:].eq(target[1,:]).all(), "val_video not synced"
+        # input_var = torch.autograd.Variable(input)
+        with torch.no_grad():
+            input_var = torch.autograd.Variable(input)
         output = model(input_var)
-        # print(input_var.shape)
-        # print(output.shape)
-        output = output.view((args.batch_size,-1) + output.size()[1:])
-        output = torch.mean(output, dim=1)
-        # print(output.shape)
+        # print("1 output",output, output.shape)
+        # output = output.view((-1,1) + output.size()[1:])#gop=1
+        # output = torch.mean(output, dim=1)
+        
+        output = torch.nn.Softmax(dim=1)(output)
+        # tmp = torch.sum(output,1)
+        # print(tmp ,tmp.shape)
+        # print("2 output",output, output.shape)
+        # # store predictions
+        # output_video = output.mean(dim=0)
 
-        loss = criterion(output, target_var)
-
-        prec1, prec5 = accuracy(output.data, target, topk=(1, 5))
-        losses.update(loss.data.item(), input.size(0))
-        top1.update(prec1.item(), input.size(0))
-        top5.update(prec5.item(), input.size(0))
-
-        optimizer.zero_grad()
-
-        loss.backward()
-        optimizer.step()
-
+        # print("output_video",output_video, output_video.shape)
+        # outputs.append(output_video.data.cpu().numpy())
+        outputs.append(output.data.cpu().numpy())
+        # print("outputs",outputs)
+        gts.append(target)
+        # print("target",target)
+        # print("gts",gts)
         batch_time.update(time.time() - end)
         end = time.time()
 
         if i % PRINT_FREQ == 0:
             print(('Epoch: [{0}][{1}/{2}], lr: {lr:.7f}\t'
-                   'Time {batch_time.val:.3f} ({batch_time.avg:.3f})\t'
-                   'Data {data_time.val:.3f} ({data_time.avg:.3f})\t'
-                   'Loss {loss.val:.4f} ({loss.avg:.4f})\t'
-                   'Prec@1 {top1.val:.3f} ({top1.avg:.3f})\t'
-                   'Prec@5 {top5.val:.3f} ({top5.avg:.3f})'.format(
+                   'Time {batch_time.val:.3f} ({batch_time.avg:.3f})'.format(
                        epoch, i, len(train_loader),
-                       batch_time=batch_time,
-                       data_time=data_time,
-                       loss=losses,
-                       top1=top1,
-                       top5=top5,
-                       lr=cur_lr)))
+                       batch_time=batch_time,lr=cur_lr)))
+    mAP, _, ap = map.charades_map(np.vstack(outputs), np.vstack(gts))
+    print(ap)
+    print(' * mAP {:.3f}'.format(mAP))
+    # batch_time = AverageMeter()
+    # data_time = AverageMeter()
+    # losses = AverageMeter()
+    # top1 = AverageMeter()
+    # top5 = AverageMeter()
+
+    # model.train()
+
+    # end = time.time()
+
+    # for i, (input, target) in enumerate(train_loader):
+
+        # data_time.update(time.time() - end)
+
+        # target = target.cuda()
+        # input_var = torch.autograd.Variable(input)
+        # target_var = torch.autograd.Variable(target)
+
+        # output = model(input_var)
+
+        # output = output.view((-1,1) + output.size()[1:])#gop=1
+        # output = torch.mean(output, dim=1)
+
+        # target_var = target_var.float()
+        # m = torch.nn.Sigmoid()
+        # loss_l = torch.nn.BCELoss().cuda()
+
+        # loss = loss_l(m(output), target_var)
+        # print(loss)
+
+        # prec1, prec5 = accuracy(output.data, target, topk=(1, 5))
+        # losses.update(loss.data.item(), input.size(0))
+        # top1.update(prec1.item(), input.size(0))
+        # top5.update(prec5.item(), input.size(0))
+
+        # optimizer.zero_grad()
+
+        # loss.backward()
+        # optimizer.step()
+
+        # batch_time.update(time.time() - end)
+        # end = time.time()
+
+        # if i % PRINT_FREQ == 0:
+        #     print(('Epoch: [{0}][{1}/{2}], lr: {lr:.7f}\t'
+        #            'Time {batch_time.val:.3f} ({batch_time.avg:.3f})\t'
+        #            'Data {data_time.val:.3f} ({data_time.avg:.3f})\t'
+        #            'Loss {loss.val:.4f} ({loss.avg:.4f})\t'
+        #            'Prec@1 {top1.val:.3f} ({top1.avg:.3f})\t'
+        #            'Prec@5 {top5.val:.3f} ({top5.avg:.3f})'.format(
+        #                epoch, i, len(train_loader),
+        #                batch_time=batch_time,
+        #                data_time=data_time,
+        #                loss=losses,
+        #                top1=top1,
+        #                top5=top5,
+        #                lr=cur_lr)))
 
 def validate(val_loader, model, criterion):
     batch_time = AverageMeter()
-    losses = AverageMeter()
-    top1 = AverageMeter()
-    top5 = AverageMeter()
+    outputs = []
+    gts = []
+    ids = []
+
 
     model.eval()
 
     end = time.time()
     for i, (input, target) in enumerate(val_loader):
-        target = target.cuda()
-        input_var = torch.autograd.Variable(input, volatile=True)
-        target_var = torch.autograd.Variable(target, volatile=True)
 
+        target = target.long()#.cuda(async=True)
+        # assert target[0,:].eq(target[1,:]).all(), "val_video not synced"
+        # input_var = torch.autograd.Variable(input)
+        with torch.no_grad():
+            input_var = torch.autograd.Variable(input)
         output = model(input_var)
-        output = output.view((args.batch_size,-1) + output.size()[1:])
-        output = torch.mean(output, dim=1)
-        loss = criterion(output, target_var)
+        # output = output.view((-1,1) + output.size()[1:])#gop=1
+        # output = torch.mean(output, dim=1)
+        output = torch.nn.Softmax(dim=1)(output)
 
-        prec1, prec5 = accuracy(output.data, target, topk=(1, 5))
-
-        losses.update(loss.item(), input.size(0))
-        
-        top1.update(prec1.item(), input.size(0))
-        top5.update(prec5.item(), input.size(0))
-
+        # store predictions
+        output_video = output.mean(dim=0)
+        outputs.append(output_video.data.cpu().numpy())
+        gts.append(target[0,:])
         batch_time.update(time.time() - end)
         end = time.time()
 
         if i % PRINT_FREQ == 0:
             print(('Test: [{0}/{1}]\t'
-                   'Time {batch_time.val:.3f} ({batch_time.avg:.3f})\t'
-                   'Loss {loss.val:.4f} ({loss.avg:.4f})\t'
-                   'Prec@1 {top1.val:.3f} ({top1.avg:.3f})\t'
-                   'Prec@5 {top5.val:.3f} ({top5.avg:.3f})'.format(
+                   'Time {batch_time.val:.3f} ({batch_time.avg:.3f})'.format(
                        i, len(val_loader),
-                       batch_time=batch_time,
-                       loss=losses,
-                       top1=top1,
-                       top5=top5)))
+                       batch_time=batch_time)))
+    mAP, _, ap = map.charades_map(np.vstack(outputs), np.vstack(gts))
+    print(ap)
+    print(' * mAP {:.3f}'.format(mAP))
 
-    print(('Testing Results: Prec@1 {top1.avg:.3f} Prec@5 {top5.avg:.3f} Loss {loss.avg:.5f}'
-           .format(top1=top1, top5=top5, loss=losses)))
+    return mAP
 
-    return top1.avg
+    # batch_time = AverageMeter()
+    # losses = AverageMeter()
+    # top1 = AverageMeter()
+    # top5 = AverageMeter()
+
+    # model.eval()
+
+    # end = time.time()
+    # for i, (input, target) in enumerate(val_loader):
+    #     target = target.long().cuda(async=True)
+    #     input_var = torch.autograd.Variable(input, volatile=True)
+    #     target_var = torch.autograd.Variable(target, volatile=True)
+
+    #     output = model(input_var)
+    #     output = output.view((-1,1) + output.size()[1:])
+
+    #     target_var = target_var.float()
+    #     m = torch.nn.Sigmoid()
+    #     loss_l = torch.nn.BCELoss().cuda()
+
+    #     loss = loss_l(m(output), target_var)
+    #     prec1, prec5 = accuracy(output.data, target_var, topk=(1, 5))
+
+    #     losses.update(loss.item(), input.size(0))
+
+    #     top1.update(prec1.item(), input.size(0))
+    #     top5.update(prec5.item(), input.size(0))
+
+    #     batch_time.update(time.time() - end)
+    #     end = time.time()
+
+    #     if i % PRINT_FREQ == 0:
+    #         print(('Test: [{0}/{1}]\t'
+    #                'Time {batch_time.val:.3f} ({batch_time.avg:.3f})\t'
+    #                'Loss {loss.val:.4f} ({loss.avg:.4f})\t'
+    #                'Prec@1 {top1.val:.3f} ({top1.avg:.3f})\t'
+    #                'Prec@5 {top5.val:.3f} ({top5.avg:.3f})'.format(
+    #                    i, len(val_loader),
+    #                    batch_time=batch_time,
+    #                    loss=losses,
+    #                    top1=top1,
+    #                    top5=top5)))
+
+    # print(('Testing Results: Prec@1 {top1.avg:.3f} Prec@5 {top5.avg:.3f} Loss {loss.avg:.5f}'
+    #        .format(top1=top1, top5=top5, loss=losses)))
+
+    # return top1.avg
 
 
 def save_checkpoint(state, is_best, filename):
