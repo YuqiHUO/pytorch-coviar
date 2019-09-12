@@ -97,30 +97,32 @@ class CoviarDataSet(data.Dataset):
             num_frames = get_num_frames(vpath)
             num_gop = num_frames // GOP_SIZE
 
-            for gop in range(num_gop//5):
-                target = torch.IntTensor(157).zero_()
-                c = 0
-                for x in label:
-                    if (x['start'] < gop*5*0.4) and ((gop*5+1)*0.4 < x['end']):
-                        target[cls2int(x['class'])] = 1
-                        c = c+1
-                # print(target, c)
-                print(c)
-                if c != 0 :
-                    gop_index.append(gop*5)
-                    video_path.append(vpath)
-                    targets.append(target)
-                    ids.append(vid)
 
-
-
-            # for x in label:
-            #     for gop in range(num_gop):
+            # # one hot
+            # for gop in range(num_gop//5):
+            #     target = torch.IntTensor(157).zero_()
+            #     c = 0
+            #     for x in label:
             #         if (x['start'] < gop*5*0.4) and ((gop*5+1)*0.4 < x['end']):
-            #             video_path.append(vpath)
-            #             gop_index.append(gop)
-            #             targets.append(cls2int(x['class']))
-            #             ids.append(vid)
+            #             target[cls2int(x['class'])] = 1
+            #             c = c+1
+            #     print(target, c)
+            #     # print(c)
+            #     if c != 0 :
+            #         gop_index.append(gop*5)
+            #         video_path.append(vpath)
+            #         targets.append(target)
+            #         ids.append(vid)
+
+
+            # one target one gop
+            for x in label:
+                for gop in range(num_gop):
+                    if (x['start'] < gop*5*0.4) and ((gop*5+1)*0.4 < x['end']):
+                        video_path.append(vpath)
+                        gop_index.append(gop)
+                        targets.append(cls2int(x['class']))
+                        ids.append(vid)
 
 
             # if self._is_train :
